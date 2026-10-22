@@ -21,25 +21,87 @@
   function busy(on, t) { $('busy').hidden = !on; if (t) $('busyText').textContent = t; }
   const paint = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
 
-  // ---------- face mesh ----------
+  // ---------- face landmarks ----------
+  // Engine 1: MediaPipe Tasks FaceLandmarker on the CPU (no dependence on the phone's GPU/WebGL).
+  // Engine 2: legacy MediaPipe Face Mesh (WebGL), used only if engine 1 is unavailable or finds nothing.
+  const diag = [];
+  let tasksReady = null;
+  function waitTasks() {
+    if (window.MPTasks) return Promise.resolve(window.MPTasks);
+    return new Promise((res, rej) => {
+      window.addEventListener('mptasks', () => res(window.MPTasks), { once: true });
+      setTimeout(() => rej(new Error('tasks module did not load')), 15000);
+    });
+  }
+  function getTasks() {
+    if (tasksReady) return tasksReady;
+    tasksReady = (async () => {
+      const { FaceLandmarker, FilesetResolver } = await waitTasks();
+      const fileset = await FilesetResolver.forVisionTasks(new URL('lib/tv/wasm', location.href).href);
+      return FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: new URL('lib/tv/face_landmarker.task', location.href).href, delegate: 'CPU' },
+        runningMode: 'IMAGE', numFaces: 1,
+        minFaceDetectionConfidence: 0.3, minFacePresenceConfidence: 0.3
+      });
+    })();
+    tasksReady.catch(e => { diag.push('T:' + (e && e.message || e)); tasksReady = null; });
+    return tasksReady;
+  }
   function getMesh() {
     if (meshReady) return meshReady;
     meshReady = (async () => {
       mesh = new FaceMesh({ locateFile: f => 'lib/fm/' + f });
-      mesh.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5, selfieMode: false });
+      mesh.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.3, minTrackingConfidence: 0.3, selfieMode: false });
       mesh.onResults(r => { if (pending) { const p = pending; pending = null; p(r); } });
       await mesh.initialize();
       return mesh;
     })();
-    meshReady.catch(() => { meshReady = null; });
+    meshReady.catch(e => { diag.push('M:' + (e && e.message || e)); meshReady = null; });
     return meshReady;
   }
-  async function detect(canvas) {
+  // Returns normalised landmarks [{x,y}] relative to the canvas, or null.
+  async function runTasks(c) {
+    const fl = await getTasks();
+    const r = fl.detect(c);
+    return (r && r.faceLandmarks && r.faceLandmarks[0]) || null;
+  }
+  async function runMesh(c) {
     const m = await getMesh();
     if (typeof m.reset === 'function') m.reset();
     const res = new Promise(r => { pending = r; });
-    await m.send({ image: canvas });
-    return res;
+    await m.send({ image: c });
+    const r = await res;
+    return (r.multiFaceLandmarks && r.multiFaceLandmarks[0]) || null;
+  }
+  // Variants: as-is, scaled down, and padded (close-up selfies where the face fills the frame).
+  function variants(src) {
+    const out = [{ c: src, ox: 0, oy: 0, w: 1, h: 1 }];
+    const k = Math.min(1, 640 / Math.max(src.width, src.height));
+    if (k < 1) {
+      const c = document.createElement('canvas'); c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
+      c.getContext('2d').drawImage(src, 0, 0, c.width, c.height); out.push({ c, ox: 0, oy: 0, w: 1, h: 1 });
+    }
+    const pad = 0.35, s = Math.min(1, 640 / Math.max(src.width, src.height));
+    const W = Math.round(src.width * s * (1 + 2 * pad)), H = Math.round(src.height * s * (1 + 2 * pad));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'); g.fillStyle = '#808080'; g.fillRect(0, 0, W, H);
+    g.drawImage(src, src.width * s * pad, src.height * s * pad, src.width * s, src.height * s);
+    out.push({ c, ox: pad / (1 + 2 * pad), oy: pad / (1 + 2 * pad), w: 1 / (1 + 2 * pad), h: 1 / (1 + 2 * pad) });
+    return out;
+  }
+  async function detect(canvas) {
+    const tries = variants(canvas);
+    for (const [name, run] of [['T', runTasks], ['M', runMesh]]) {
+      for (const v of tries) {
+        try {
+          const lm = await run(v.c);
+          if (lm && lm.length >= 468) {
+            return { multiFaceLandmarks: [lm.map(p => ({ x: (p.x - v.ox) / v.w, y: (p.y - v.oy) / v.h }))], engine: name };
+          }
+        } catch (e) { diag.push(name + ':' + (e && e.message || e)); break; }
+      }
+    }
+    return { multiFaceLandmarks: [] };
   }
 
   // ---------- geometry ----------
@@ -266,7 +328,7 @@
       busy(true, 'جاري قراءة ملامح الوجه…'); await paint();
       const r = await detect(photo);
       const lm = r.multiFaceLandmarks && r.multiFaceLandmarks[0];
-      if (!lm) throw new Error('ما لگيت وجه بالصورة. صوّر وجهك من الگدام بإضاءة زينة.');
+      if (!lm) throw new Error('ما لگيت وجه بالصورة. صوّر وجهك من الگدام بإضاءة زينة.' + (diag.length ? ' [' + diag.slice(-3).join(' | ').slice(0, 160) + ']' : ''));
       pts = lm.map(p => ({ x: p.x * photo.width, y: p.y * photo.height }));
       cropToFace();
       const m = measure(pts);
@@ -323,8 +385,8 @@
   };
 
   // warm up the model in the background so the first photo is quicker
-  setTimeout(() => { getMesh().catch(e => console.warn('mesh init', e)); }, 400);
+  setTimeout(() => { getTasks().catch(e => console.warn('tasks init', e)); }, 400);
 
   // test hook
-  window.__shakl = { handle, measure, classify, get result() { return result; }, makeCard };
+  window.__shakl = { diag, handle, measure, classify, get result() { return result; }, makeCard };
 })();

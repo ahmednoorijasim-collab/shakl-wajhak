@@ -136,6 +136,11 @@ footer{font-size:12px;color:var(--muted);text-align:center}
 
   <footer>كل التحليل يصير على موبايلك، وصورتك ما تطلع لأي مكان. النتيجة اقتراح تقريبي، والذوق الشخصي أهم شي.</footer>
 </div>
+<script type="module">
+import { FaceLandmarker, FilesetResolver } from './lib/tv/vision_bundle.mjs';
+window.MPTasks = { FaceLandmarker, FilesetResolver };
+window.dispatchEvent(new Event('mptasks'));
+</script>
 <script src="lib/fm/face_mesh.js"></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
