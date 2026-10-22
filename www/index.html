@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>شكل وجهك</title>
+<style>
+@font-face{font-family:'Reem Kufi';font-weight:700;font-display:swap;src:url(fonts/reem-kufi-arabic-700-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans Arabic';font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans Arabic';font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Sans Arabic';font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format('woff2')}
+/* Layout: a single column like a stylist's consultation sheet: photo with measurements, verdict, then advice tabs. */
+:root{
+  --bg:#eef1f3; --surface:#ffffff; --ink:#14191f; --muted:#5a6773; --rule:#d5dbe0;
+  --accent:#0e7c7b; --accent-ink:#ffffff; --line:#f2b134; --soft:#e2eeee;
+  --display:"Reem Kufi","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --body:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif; --r:12px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1418; --surface:#171e24; --ink:#eaf0f3; --muted:#97a6b2; --rule:#27313a;
+  --accent:#2bb3b0; --accent-ink:#06201f; --line:#f2b134; --soft:#16302f; color-scheme:dark}}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+[hidden]{display:none!important}
+.wrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-size:clamp(30px,8vw,40px);line-height:1.1;margin:0}
+.lead{margin:4px 0 0;color:var(--muted)}
+.pick{display:flex;gap:10px;flex-wrap:wrap}
+.btn{flex:1 1 150px;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 16px;border-radius:var(--r);
+  font:600 16px var(--body);border:1px solid var(--rule);background:var(--surface);color:var(--ink);cursor:pointer;user-select:none;-webkit-user-select:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible,.chip:focus-visible,.tabs button:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+.tips{margin:0;padding:12px 14px;border-radius:var(--r);background:var(--soft);font-size:14px;color:var(--ink)}
+.stage{position:relative;border-radius:var(--r);overflow:hidden;background:#000}
+.stage canvas{display:block;width:100%;height:auto}
+.busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,12,15,.6);color:#fff;font-weight:600;padding:16px;text-align:center}
+.toggle{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.msg{margin:0;font-size:14px;color:var(--muted)}
+.msg.err{color:#d64545}
+.verdict{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:12px}
+.eyebrow{font-size:13px;letter-spacing:.03em;color:var(--muted);margin:0}
+.shape{font-family:var(--display);font-size:36px;line-height:1.1;margin:0;color:var(--accent)}
+.about{margin:0}
+.barrow{display:grid;grid-template-columns:7.5em 1fr 3.2em;align-items:center;gap:10px;font-size:14px}
+.track{height:8px;background:var(--soft);border-radius:99px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.barrow b{font-variant-numeric:tabular-nums;font-weight:600;text-align:left}
+.ratios{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;margin:0}
+.tabs{display:flex;gap:6px;background:var(--surface);border:1px solid var(--rule);border-radius:99px;padding:4px}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:600 15px var(--body);padding:10px 6px;border-radius:99px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.pane{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:6px}
+.pane h3{margin:8px 0 0;font-size:15px}
+.pane h3:first-child{margin-top:0}
+.pane ul{margin:0;padding-inline-start:20px}
+.pane li{margin:2px 0}
+.good h3{color:var(--accent)}
+.bad{color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--rule);background:var(--bg);color:var(--ink);font:500 15px var(--body);padding:8px 14px;border-radius:99px;cursor:pointer}
+.chip[data-good="true"]{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.note{font-size:13px;color:var(--muted);margin:0}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+footer{font-size:12px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>شكل وجهك</h1>
+    <p class="lead">صوّر وجهك، ونعرفلك شكله، ونقترح القصة واللحية والنظارة ولفّة الحجاب اللي تناسبه.</p>
+  </header>
+
+  <div class="pick">
+    <label class="btn primary" for="fileCam">صوّر وجهك</label>
+    <label class="btn" for="fileGal">من الاستوديو</label>
+  </div>
+  <input type="file" id="fileCam" accept="image/*" capture="user" class="vh">
+  <input type="file" id="fileGal" accept="image/*" class="vh">
+  <p class="tips">للنتيجة الأدق: صوّر من الگدام بمستوى العين، والشعر مرجوع عن الجبهة، وبدون نظارة، وبإضاءة زينة.</p>
+
+  <div id="stageWrap" hidden>
+    <div class="stage">
+      <canvas id="view"></canvas>
+      <div class="busy" id="busy" hidden><span id="busyText">جاري قراءة ملامح الوجه…</span></div>
+    </div>
+  </div>
+  <p class="msg" id="msg" role="status"></p>
+
+  <section id="result" hidden>
+    <div class="wrap" style="gap:14px">
+      <label class="toggle"><input type="checkbox" id="showLines" checked> إظهار خطوط القياس</label>
+      <div class="verdict">
+        <p class="eyebrow">شكل وجهك الأقرب</p>
+        <p class="shape" id="shapeName"></p>
+        <p class="about" id="shapeAbout"></p>
+        <div id="bars" style="display:flex;flex-direction:column;gap:6px"></div>
+        <p class="ratios" id="ratios"></p>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-hair" aria-selected="true">الشعر واللحية</button>
+        <button type="button" role="tab" id="tab-glasses" aria-selected="false">النظارات</button>
+        <button type="button" role="tab" id="tab-hijab" aria-selected="false">الحجاب</button>
+      </div>
+
+      <div class="pane" id="pane-hair">
+        <div class="good"><h3>قصات تناسبك</h3><ul id="hairGood"></ul></div>
+        <h3>اللحية</h3><ul id="beard"></ul>
+        <div class="bad"><h3>تجنّب</h3><ul id="hairAvoid"></ul></div>
+      </div>
+
+      <div class="pane" id="pane-glasses" hidden>
+        <h3>جرّب نظارة على صورتك</h3>
+        <p class="note">الإطارات اللي عليها ✓ هي الأنسب لشكل وجهك. اضغط على أي واحد حتى ينرسم على صورتك.</p>
+        <div class="chips" id="frames"></div>
+        <div class="bad"><h3>تجنّب</h3><ul id="glassAvoid"></ul></div>
+      </div>
+
+      <div class="pane" id="pane-hijab" hidden>
+        <div class="good"><h3>لفّات تناسبچ</h3><ul id="hijabGood"></ul></div>
+        <div class="bad"><h3>تجنّبي</h3><ul id="hijabAvoid"></ul></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="share" type="button">أرسل النتيجة</button>
+        <button class="btn" id="save" type="button">حفظ بالاستوديو</button>
+      </div>
+      <p class="note">زر "أرسل النتيجة" يرسل الصورة مع الاقتراحات، مثلاً للحلاق قبل موعدك.</p>
+    </div>
+  </section>
+
+  <footer>كل التحليل يصير على موبايلك، وصورتك ما تطلع لأي مكان. النتيجة اقتراح تقريبي، والذوق الشخصي أهم شي.</footer>
+</div>
+<script src="lib/fm/face_mesh.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
