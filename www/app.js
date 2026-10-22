@@ -334,6 +334,7 @@
       const m = measure(pts);
       result = classify(m);
       renderStage(); showResult();
+      setTimeout(cleanup, 3000);
       if (m.yaw > 0.22) say('وجهك مايل شوية، فالنتيجة ممكن ما تكون دقيقة. للأدق: صوّر من الگدام والشعر مرجوع عن الجبهة.');
       else say('');
       $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -383,6 +384,23 @@
       try { await shareCard(''); } catch {}
     }
   };
+
+  // Privacy: remove camera captures (Android keeps them in the app's private Pictures folder)
+  // and shared result cards from the cache. Runs at launch and after every analysis.
+  async function cleanup() {
+    const { Filesystem } = Plug();
+    if (!Filesystem) return;
+    for (const [directory, path, re] of [['EXTERNAL', 'Pictures', /^JPEG_.*\.jpg$/i], ['CACHE', '', /^shakl-\d+\.jpg$/i]]) {
+      try {
+        const { files } = await Filesystem.readdir({ directory, path });
+        for (const f of files || []) {
+          const name = typeof f === 'string' ? f : f.name;
+          if (re.test(name)) { try { await Filesystem.deleteFile({ directory, path: path ? path + '/' + name : name }); } catch {} }
+        }
+      } catch {}
+    }
+  }
+  setTimeout(cleanup, 1500);
 
   // warm up the model in the background so the first photo is quicker
   setTimeout(() => { getTasks().catch(e => console.warn('tasks init', e)); }, 400);
